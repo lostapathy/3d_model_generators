@@ -4,7 +4,7 @@ use <helper_disk.scad>
 function _box_hole_inset(face_screw_size, wall) =
   heatset_hole_diameter(face_screw_size)/2 + 1.5 * wall;
 
-module project_box(size, wall=1.5, face_screw_size=false, helper_disks=false) {
+module project_box(size, wall=1.5, face_screw_size=false, helper_disks=false, max_span=100) {
   box_height = size[2];
 
   difference() {
@@ -13,14 +13,51 @@ module project_box(size, wall=1.5, face_screw_size=false, helper_disks=false) {
       cube(size - [wall*2, wall*2, 0]);
   }
 
-  if(face_screw_size) {
-    _project_box_face_hole_post(size, wall, face_screw_size); // bottom left
-    translate([0, size[1], 0]) mirror([0,1,0]) _project_box_face_hole_post(size, wall, face_screw_size); // top left
-    translate([size[0], 0, 0]) mirror([1,0,0]) _project_box_face_hole_post(size, wall, face_screw_size); // bottom_right
-    translate([size[0], size[1], 0]) mirror([1,1,0]) _project_box_face_hole_post(size, wall, face_screw_size); // top right
+  inset = _box_hole_inset(face_screw_size, wall);
+
+  x_divisions = floor((size[0] - 2 * inset)/max_span);
+  for(i = [0:x_divisions + 1]) {
+    offset = inset + (size[0] - 2*inset)/(x_divisions + 1.0)*i;
+    translate([offset, 0, 0])
+      _project_box_post(size[2], wall, face_screw_size);
+
+    translate([offset, size[1], 0])
+      mirror([0,1,0])
+        _project_box_post(size[2], wall, face_screw_size);
   }
+
+  y_divisions = floor((size[1] - 2 * inset)/max_span);
+  for(i = [0:y_divisions + 1]) {
+    offset = inset + (size[1] - 2*inset)/(y_divisions + 1.0)*i;
+    translate([0, offset, 0])
+      rotate([0,0,-90]) _project_box_post(size[2], wall, face_screw_size);
+
+    translate([size[0], offset, 0])
+      mirror([1,0,0])
+        rotate([0,0,-90]) _project_box_post(size[2], wall, face_screw_size);
+  }
+
   if(helper_disks) {
     helper_disks_for_rectangle(size, center=false);
+  }
+}
+
+module _project_box_post(height, wall, screw_size) {
+  _fudge_hole_size = 0.35;
+  inset_hole_diameter = heatset_hole_diameter(screw_size) + _fudge_hole_size;
+  inset_hole_depth = heatset_hole_depth(screw_size) + 0.5;
+  inset = _box_hole_inset(screw_size, wall);
+  box_height = height;
+
+  difference() {
+    union() {
+      translate([0,inset,0])
+        cylinder(d=inset_hole_diameter+2*wall, h=box_height, $fn=50);
+      translate([-inset_hole_diameter/2-wall,0,0]) cube([inset_hole_diameter+2*wall, inset, box_height]);
+
+    }
+    translate([0, inset,box_height-inset_hole_depth])
+      cylinder(d=inset_hole_diameter,h=inset_hole_depth+1, $fn=20);
   }
 }
 
@@ -45,24 +82,5 @@ echo ("inset is: ", inset);
   }
 }
 
-module _project_box_face_hole_post(size, wall, screw_size) {
-  _fudge_hole_size = 0.35;
-  inset_hole_diameter = heatset_hole_diameter(screw_size) + _fudge_hole_size;
-  inset_hole_depth = heatset_hole_depth(screw_size) + 0.5;
-  inset = _box_hole_inset(screw_size, wall);
-  box_height = size[2];
-
-  difference() {
-    union() {
-      translate([inset,inset,0])
-        cylinder(d=inset_hole_diameter+2*wall, h=box_height, $fn=50);
-      cube([inset+inset_hole_diameter/2+wall, inset, box_height]);
-      cube([inset, inset+inset_hole_diameter/2+wall, box_height]);
-    }
-    translate([inset, inset,box_height-inset_hole_depth])
-      cylinder(d=inset_hole_diameter,h=inset_hole_depth+1, $fn=20);
-  }
-}
-
-//project_box([100,50,50], face_screw_size=5, helper_disks=true);
-//translate([0,0,46]) project_box_face([100,50], face_screw_size=5, wall=1.5);
+project_box([100,100,70], face_screw_size=5, helper_disks=false);
+//translate([0,0,55]) project_box_face([100,50], face_screw_size=5, wall=1.5);
