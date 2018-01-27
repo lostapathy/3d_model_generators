@@ -1,5 +1,6 @@
 use <heatset_insert.scad>
 use <helper_disk.scad>
+use <layout.scad>
 
 function _box_hole_inset(face_screw_size, wall) =
   heatset_hole_diameter(face_screw_size)/2 + 1.5 * wall;
@@ -67,7 +68,7 @@ module project_box_face(size, thickness = 2.5, wall=1.5, face_screw_size=false, 
 echo ("inset is: ", inset);
 
   difference() {
-    cube([size[0], size[1], wall]);
+    cube([size[0], size[1], thickness]);
 
     if(face_screw_size) {
       $fn =  draft? 5 : 20;
@@ -75,12 +76,48 @@ echo ("inset is: ", inset);
       translate([inset, size[1]-inset, -1]) mirror([0,1,0]) cylinder(d=face_hole_d, h=wall+2); // top left
       translate([size[0] - inset, inset, -1]) mirror([1,0,0]) cylinder(d=face_hole_d, h=wall+2); // bottom_right
       translate([size[0] - inset, size[1] - inset, -1]) mirror([1,1,0]) cylinder(d=face_hole_d, h=wall+2); // top right
+
+
+  x_divisions = floor((size[0] - 2 * inset)/max_span);
+  for(i = [0:x_divisions + 1]) {
+    offset = inset + (size[0] - 2*inset)/(x_divisions + 1.0)*i;
+
+    translate([0,size[1]/2,-1]) mirror_y()
+      translate([offset, size[1]/2-inset, 0]){
+        cylinder(d=face_hole_d, h=thickness+2);
+          }
+  }
+
+  y_divisions = floor((size[1] - 2 * inset)/max_span);
+  for(i = [0:y_divisions + 1]) {
+    offset = inset + (size[1] - 2*inset)/(y_divisions + 1.0)*i;
+
+  translate([size[0]/2,0,-1]) mirror_x()
+      translate([size[0]/2-inset, offset, 0]){
+        cylinder(d=face_hole_d, h=thickness+2);
+          }
     }
+
+  }
+
   }
   if(helper_disks) {
     helper_disks_for_rectangle(size, center=false);
   }
 }
 
-project_box([100,100,70], face_screw_size=5, helper_disks=false);
-//translate([0,0,55]) project_box_face([100,50], face_screw_size=5, wall=1.5);
+size = [100,200,20];
+wall=1.5;
+screw_size=3;
+max_span=70;
+project_box(size,
+            face_screw_size=screw_size,
+            helper_disks=true,
+            wall=wall,
+            max_span=max_span);
+translate([size[0]+10,0,0])
+    project_box_face(size,
+                     face_screw_size=screw_size,
+                     wall=wall,
+                     max_span=max_span,
+                     thickness=2.5);
