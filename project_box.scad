@@ -1,123 +1,146 @@
 use <heatset_insert.scad>
-use <helper_disk.scad>
-use <layout.scad>
+use <3d_print/helper_disk.scad>
+use <layout/layout.scad>
+use <soften/fillets.scad>
+use <soften/cylinder.scad>
+use <soften/cube.scad>
+include <constants/all.scad>
 
 function _box_hole_inset(face_screw_size, wall) =
   heatset_hole_diameter(face_screw_size)/2 + 1.5 * wall;
 
-module project_box(size, wall=1.5, face_screw_size=false, helper_disks=false, max_span=100) {
-  box_height = size[2];
-
-  difference() {
-    cube(size);
-    translate([wall, wall ,wall])
-      cube(size - [wall*2, wall*2, 0]);
-  }
-
+module _project_box_bolt_pattern(size, wall, face_screw_size) {
   inset = _box_hole_inset(face_screw_size, wall);
 
-  x_divisions = floor((size[0] - 2 * inset)/max_span);
-  for(i = [0:x_divisions + 1]) {
-    offset = inset + (size[0] - 2*inset)/(x_divisions + 1.0)*i;
-    translate([offset, 0, 0])
-      _project_box_post(size[2], wall, face_screw_size);
-
-    translate([offset, size[1], 0])
-      mirror([0,1,0])
-        _project_box_post(size[2], wall, face_screw_size);
+  x_posts = ceil((size.x - 2 * inset)/max_span);
+  x_offset = (size.x - 2*inset)/(x_posts);
+  echo("x_posts: ", x_posts, " at ", x_offset);
+  for(i = [0:x_posts-1]) {
+    mirror_xy() {
+      offset = (size.x/2 - inset) - i * x_offset;
+      translate([offset, -(size.y/2)+inset, 0])
+        children();//_project_box_post(size.z, wall, face_screw_size);
+    }
   }
 
-  y_divisions = floor((size[1] - 2 * inset)/max_span);
-  for(i = [0:y_divisions + 1]) {
-    offset = inset + (size[1] - 2*inset)/(y_divisions + 1.0)*i;
-    translate([0, offset, 0])
-      rotate([0,0,-90]) _project_box_post(size[2], wall, face_screw_size);
-
-    translate([size[0], offset, 0])
-      mirror([1,0,0])
-        rotate([0,0,-90]) _project_box_post(size[2], wall, face_screw_size);
-  }
-
-  if(helper_disks) {
-    helper_disks_for_rectangle(size, center=false);
+  y_posts = ceil((size.y - 2 * inset)/max_span);
+  y_offset = (size.y - 2*inset)/(y_posts);
+  echo("y_posts: ", y_posts, " at ", y_offset);
+  for(i = [0:y_posts-1]) {
+    mirror_xy() {
+      offset = (size.y/2 - inset) - i * y_offset;
+      translate([ -(size.x/2)+inset, offset , 0])
+        rotate([0,0,-90])
+          children();//_project_box_post(size.z, wall, face_screw_size);
+    }
   }
 }
 
-module _project_box_post(height, wall, screw_size) {
+module project_box(size, wall=1.5, face_screw_size=false, helper_disks=false, max_span=100, outside_r=0, fillet_r=3) {
+  box_height = size[2];
+
+  module outside_shell() {
+    translate([0,0,box_height/2])
+      soft_cube(size, r=outside_r, center=true);
+  }
+
+  module blank_shell() {
+    difference() {
+      outside_shell($fn=100);
+      translate([0,0,wall+box_height/2])
+        soft_cube(size - [wall*2, wall*2, 0], center=true,r=fillet_r, sidesonly=false);
+    }
+  }
+
+  // generate the basic shell
+  union() {
+  render() blank_shell();
+
+  intersection() {
+    outside_shell();
+    _project_box_bolt_pattern(size, wall, face_screw_size) {
+      _project_box_post(size.z, wall, face_screw_size, fillet_r);
+    }
+  }
+}
+  if(helper_disks) {
+    helper_disks_for_rectangle(size, center=true);
+  }
+}
+
+module _project_box_post(height, wall, screw_size, fillet_r) {
   _fudge_hole_size = 0.35;
   inset_hole_diameter = heatset_hole_diameter(screw_size) + _fudge_hole_size;
   inset_hole_depth = heatset_hole_depth(screw_size) + 0.5;
   inset = _box_hole_inset(screw_size, wall);
   box_height = height;
 
-  difference() {
-    union() {
-      translate([0,inset,0])
-        cylinder(d=inset_hole_diameter+2*wall, h=box_height, $fn=50);
-      translate([-inset_hole_diameter/2-wall,0,0]) cube([inset_hole_diameter+2*wall, inset, box_height]);
+  translate([0,-inset,0])
+    difference() {
+      union() {
+        translate([0,inset,wall])
+          soft_cylinder(d=inset_hole_diameter+2*wall, h=box_height-wall, fillet_r=fillet_r, fillet_angle=180);
+        translate([-inset_hole_diameter/2-wall,0,0]) cube([inset_hole_diameter+2*wall, inset, box_height]);
+          mirror_x() translate([inset_hole_diameter/2+wall,wall,0]) {
+            fillet(size[2],fillet_r, axis=z_axis);
+          }
+          mirror_x() translate([inset_hole_diameter/2+wall,wall, wall]) fillet(inset-wall,fillet_r, axis=y_axis);
 
+
+       mirror_x() difference() {
+          translate([inset_hole_diameter/2+wall,wall,wall]) cube([fillet_r,fillet_r,fillet_r]);
+          translate([inset_hole_diameter/2+wall+fillet_r,wall+fillet_r,wall+fillet_r]) sphere(r=fillet_r);
+       }
+
+      }
+      translate([0, inset,box_height-inset_hole_depth])
+        cylinder(d=inset_hole_diameter,h=inset_hole_depth+1, $fn=20);
     }
-    translate([0, inset,box_height-inset_hole_depth])
-      cylinder(d=inset_hole_diameter,h=inset_hole_depth+1, $fn=20);
-  }
 }
 
-module project_box_face(size, thickness = 2.5, wall=1.5, face_screw_size=false, draft=false, helper_disks = false) {
+module project_box_face(size, thickness = 2.5, wall=1.5, face_screw_size=false, helper_disks = false, outside_r=0) {
   face_hole_d = heatset_hole_clearance_diameter(face_screw_size);
   inset = _box_hole_inset(face_screw_size, wall); //inset_hole_d/2+0.75*wall+0.4;
-echo ("inset is: ", inset);
 
   difference() {
-    cube([size[0], size[1], thickness]);
-
+    //cube([size[0], size[1], thickness]);
+    translate([0,0,thickness/2])
+      soft_cube([size.x,size.y, thickness], r=outside_r, center=true);
     if(face_screw_size) {
-      $fn =  draft? 5 : 20;
-      translate([inset, inset, -1]) cylinder(d=face_hole_d, h=wall+2); // bottom left
-      translate([inset, size[1]-inset, -1]) mirror([0,1,0]) cylinder(d=face_hole_d, h=wall+2); // top left
-      translate([size[0] - inset, inset, -1]) mirror([1,0,0]) cylinder(d=face_hole_d, h=wall+2); // bottom_right
-      translate([size[0] - inset, size[1] - inset, -1]) mirror([1,1,0]) cylinder(d=face_hole_d, h=wall+2); // top right
-
-
-  x_divisions = floor((size[0] - 2 * inset)/max_span);
-  for(i = [0:x_divisions + 1]) {
-    offset = inset + (size[0] - 2*inset)/(x_divisions + 1.0)*i;
-
-    translate([0,size[1]/2,-1]) mirror_y()
-      translate([offset, size[1]/2-inset, 0]){
-        cylinder(d=face_hole_d, h=thickness+2);
-          }
-  }
-
-  y_divisions = floor((size[1] - 2 * inset)/max_span);
-  for(i = [0:y_divisions + 1]) {
-    offset = inset + (size[1] - 2*inset)/(y_divisions + 1.0)*i;
-
-  translate([size[0]/2,0,-1]) mirror_x()
-      translate([size[0]/2-inset, offset, 0]){
-        cylinder(d=face_hole_d, h=thickness+2);
-          }
+      _project_box_bolt_pattern(size, wall, face_screw_size) {
+        translate([0,0,-epsilon]) cylinder(d=face_hole_d, h=thickness+2*epsilon);
+      }
     }
-
-  }
-
   }
   if(helper_disks) {
-    helper_disks_for_rectangle(size, center=false);
+    helper_disks_for_rectangle(size, center=true);
   }
 }
 
-size = [100,200,20];
-wall=1.5;
+$fn=20;
+size = [50,50,20];
+wall=3;
 screw_size=3;
-max_span=70;
+max_span=100;
 project_box(size,
             face_screw_size=screw_size,
             helper_disks=true,
             wall=wall,
-            max_span=max_span);
-translate([size[0]+10,0,0])
+            max_span=max_span,
+            outside_r=5);
+translate([size[0]+20,0,0])
     project_box_face(size,
                      face_screw_size=screw_size,
                      wall=wall,
                      max_span=max_span,
-                     thickness=2.5);
+                     thickness=2.5,
+                     outside_r=3, helper_disks=true);
+
+*translate([0,0,size.z+1])
+    project_box_face(size,
+                     face_screw_size=screw_size,
+                     wall=wall,
+                     max_span=max_span,
+                     thickness=2.5,
+                     outside_r=3, helper_disks=true);
+*_project_box_post(size.z, wall, screw_size);
