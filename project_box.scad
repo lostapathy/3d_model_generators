@@ -87,6 +87,8 @@ module _project_box_post(height, wall, screw_size, fillet_r) {
 
 
        if(!$simplify) mirror_x() difference() {
+          $fn = fillet_fn($fn, fillet_r);
+
           translate([inset_hole_diameter/2+wall,wall,wall]) cube([fillet_r,fillet_r,fillet_r]);
           translate([inset_hole_diameter/2+wall+fillet_r,wall+fillet_r,wall+fillet_r]) sphere(r=fillet_r, $fn=fn(fillet_r*2));
        }
