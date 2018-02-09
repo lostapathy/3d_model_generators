@@ -4,6 +4,8 @@ use <layout/layout.scad>
 use <soften/fillets.scad>
 use <soften/cylinder.scad>
 use <soften/cube.scad>
+use <soften/hole.scad>
+
 include <constants/all.scad>
 
 function _box_hole_inset(face_screw_size, wall) =
@@ -81,7 +83,7 @@ module _project_box_post(height, wall, screw_size, fillet_r) {
           soft_cylinder(d=inset_hole_diameter+2*wall, h=box_height-wall, fillet_r=$simplify ? 0 : fillet_r, fillet_angle=180);
         translate([-inset_hole_diameter/2-wall,0,0]) cube([inset_hole_diameter+2*wall, inset, box_height]);
           if(!$simplify) mirror_x() translate([inset_hole_diameter/2+wall,wall,0]) {
-            fillet(size[2],fillet_r, axis=z_axis, $fn=fn(fillet_r*2));
+            fillet(height,fillet_r, axis=z_axis, $fn=fn(fillet_r*2));
           }
           if(!$simplify) mirror_x() translate([inset_hole_diameter/2+wall,wall, wall]) fillet(inset-wall,fillet_r, axis=y_axis,$fn=fn(fillet_r*2));
 
@@ -108,9 +110,8 @@ module project_box_face(size, thickness = 2.5, wall=1.5, face_screw_size=false, 
     translate([0,0,thickness/2])
       soft_cube([size.x,size.y, thickness], r=outside_r, center=true);
     if(face_screw_size) {
-      _project_box_bolt_pattern(size, wall, face_screw_size) {
-        translate([0,0,-epsilon]) cylinder(d=face_hole_d, h=thickness+2*epsilon);
-      }
+      _project_box_bolt_pattern(size, wall, face_screw_size) translate([0,0,thickness]) hole(d=face_hole_d, h=thickness+epsilon);
+
     }
   }
   if(helper_disks) {
