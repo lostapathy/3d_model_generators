@@ -1,0 +1,21 @@
+GIT
+  remote: https://github.com/lostapathy/openscad-libs
+  revision: 0b92839e29758ae71c8ddcec9121ce37965f3b63
+  specs:
+    openscad_soften (0.1.0)
+      openscad_util
+    openscad_util (0.1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  openscad_soften!
+  openscad_util!
+
+BUNDLED WITH
+   1.16.1
