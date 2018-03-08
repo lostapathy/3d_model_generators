@@ -1,7 +1,8 @@
 use <3d_print/heatset_insert.scad>
+use <3d_print/heatset_insert_geometry.scad>
 use <3d_print/helper_disk.scad>
 use <layout/layout.scad>
-use <soften/fillets.scad>
+use <soften/fillet.scad>
 use <soften/cylinder.scad>
 use <soften/cube.scad>
 use <soften/hole.scad>
@@ -11,7 +12,7 @@ include <constants/all.scad>
 function _box_hole_inset(face_screw_size, wall) =
   heatset_hole_diameter(face_screw_size)[0]/2 + 1.5 * wall;
 
-module _project_box_bolt_pattern(size, wall, face_screw_size) {
+module _project_box_bolt_pattern(size, wall, face_screw_size, max_span) {
   inset = _box_hole_inset(face_screw_size, wall);
 
   x_posts = ceil((size.x - 2 * inset)/max_span);
@@ -60,7 +61,7 @@ module project_box(size, wall=1.5, face_screw_size=false, helper_disks=false, ma
 
     intersection() {
       outside_shell();
-      _project_box_bolt_pattern(size, wall, face_screw_size) {
+      _project_box_bolt_pattern(size, wall, face_screw_size, max_span) {
         _project_box_post(size.z, wall, face_screw_size, fillet_r);
       }
     }
@@ -101,7 +102,7 @@ module _project_box_post(height, wall, screw_size, fillet_r) {
     }
 }
 
-module project_box_face(size, thickness = 2.5, wall=1.5, face_screw_size=false, helper_disks = false, outside_r=0) {
+module project_box_face(size, thickness = 2.5, wall=1.5, face_screw_size=false, helper_disks = false, outside_r=0, max_span=100) {
   face_hole_d = face_screw_size * 1.1;
   inset = _box_hole_inset(face_screw_size, wall); //inset_hole_d/2+0.75*wall+0.4;
 
@@ -110,9 +111,9 @@ module project_box_face(size, thickness = 2.5, wall=1.5, face_screw_size=false, 
     translate([0,0,thickness/2])
       soft_cube([size.x,size.y, thickness], r=outside_r, center=true);
     if(face_screw_size) {
-      _project_box_bolt_pattern(size, wall, face_screw_size) translate([0,0,thickness]) hole(d=face_hole_d, h=thickness+epsilon);
+      _project_box_bolt_pattern(size, wall, face_screw_size, max_span) translate([0,0,thickness]) hole(d=face_hole_d*1.1, h=thickness+epsilon);
+    }    
 
-    }
   }
   if(helper_disks) {
     helper_disks_for_rectangle(size, center=true);
@@ -139,7 +140,7 @@ max_span=100;
                      thickness=2.5,
                      outside_r=3, helper_disks=true);
 
-*translate([0,0,size.z+1])
+translate([0,0,size.z+1])
     project_box_face(size,
                      face_screw_size=screw_size,
                      wall=wall,
